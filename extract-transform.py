@@ -7,7 +7,7 @@ import os
 DEPT_CODE = "67"  # Ex: "67" pour Bas-Rhin, "75" pour Paris...
 # ============================================================
 
-DATA_DIR = "../data"
+DATA_DIR = "data"
 CLEAN_DIR = "clean"
 os.makedirs(CLEAN_DIR, exist_ok=True)
 
