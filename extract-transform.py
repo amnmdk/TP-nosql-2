@@ -14,7 +14,7 @@ os.makedirs(CLEAN_DIR, exist_ok=True)
 print(f"Département cible : {DEPT_CODE}")
 
 # ============================================================
-# EXTRACT
+# EXTRACTION
 # ============================================================
 
 print("\n--- Chargement des fichiers ---")
@@ -58,7 +58,7 @@ print(f"  insee_communes  : {len(df_insee):>7} lignes")
 print(f"  departements    : {len(df_depts):>7} lignes")
 
 # ============================================================
-# TRANSFORM — Unification des codes
+# TRANSFORMATION — Unification des codes
 # ============================================================
 
 print("\n--- Transformation des codes ---")
@@ -98,7 +98,7 @@ df_depts["code_departement"] = (
 print("  Codes unifiés : département sur 2 chars, commune sur 5 chars")
 
 # ============================================================
-# TRANSFORM — Filtrage têtes de liste
+# TRANSFORMATION — Filtrage têtes de liste
 # ============================================================
 
 print("\n--- Filtrage des têtes de liste ---")
@@ -107,7 +107,7 @@ df_tetes = df_candidats[df_candidats["Tête de liste"].str.strip() == "OUI"].cop
 print(f"  Têtes de liste : {len(df_tetes)} (sur {len(df_candidats)} candidats)")
 
 # ============================================================
-# TRANSFORM — Filtrage par département
+# TRANSFORMATION — Filtrage par département
 # ============================================================
 
 print(f"\n--- Filtrage département {DEPT_CODE} ---")
@@ -129,7 +129,7 @@ if len(df_candidats_dept) == 0:
     print("  Vérifiez la valeur de DEPT_CODE en tête de script.")
 
 # ============================================================
-# SAVE — Sauvegarde dans clean/
+# SAUVEGARDE — Écriture des fichiers nettoyés dans clean/
 # ============================================================
 
 print(f"\n--- Sauvegarde dans {CLEAN_DIR}/ ---")
