@@ -1,154 +1,82 @@
 import pandas as pd
-import os
+from csv import QUOTE_NONNUMERIC
+
+# Département cible — à modifier selon votre département
+dept = '01'
 
 # ============================================================
-# CONFIGURATION — Changez le code de votre département ici
-# ============================================================
-DEPT_CODE = "67"  # Ex: "67" pour Bas-Rhin, "75" pour Paris...
+# EXTRACTION + TRANSFORMATION — Régions
 # ============================================================
 
-DATA_DIR = "data"
-CLEAN_DIR = "clean"
-os.makedirs(CLEAN_DIR, exist_ok=True)
-
-print(f"Département cible : {DEPT_CODE}")
+df_regions = pd.read_csv('data/regions-france.csv', sep=",", dtype=str)
+df_regions.to_csv(f'clean/{dept}-regions.csv', sep=",", index=False, quoting=QUOTE_NONNUMERIC)
 
 # ============================================================
-# EXTRACTION
+# EXTRACTION + TRANSFORMATION — Départements
 # ============================================================
 
-print("\n--- Chargement des fichiers ---")
+df_deps = pd.read_csv('data/departements-france.csv', sep=",", dtype=str)
+# Normalisation du code département sur 2 caractères
+df_deps['code_departement'] = df_deps['code_departement'].str.zfill(2)
+df_deps.to_csv(f'clean/{dept}-departements.csv', sep=",", index=False, quoting=QUOTE_NONNUMERIC)
 
-# candidats : séparateur ; , encodage utf-8
-df_candidats = pd.read_csv(
-    f"{DATA_DIR}/candidats-2026.csv",
-    sep=";",
-    encoding="utf-8",
-    dtype=str,
-)
+# ============================================================
+# EXTRACTION + TRANSFORMATION — Communes
+# ============================================================
 
-# communes : séparateur , , code numérique → string
 df_communes = pd.read_csv(
-    f"{DATA_DIR}/communes.csv",
-    sep=",",
-    encoding="utf-8",
-    dtype=str,
+    'data/communes.csv', sep=",",
+    # Forcer ces colonnes en str pour préserver les zéros initiaux
+    dtype={'code_commune_INSEE': str, 'code_departement': str, 'code_region': str}
 )
+# Normalisation des codes : commune sur 5 chars, département et région sur 2 chars
+df_communes['code_commune_INSEE'] = df_communes['code_commune_INSEE'].str.zfill(5)
+df_communes['code_departement']   = df_communes['code_departement'].str.zfill(2)
+df_communes['code_region']        = df_communes['code_region'].str.zfill(2)
+# Sélection des colonnes utiles
+df_communes = df_communes[['code_commune_INSEE', 'nom_commune', 'latitude', 'longitude', 'code_departement', 'code_region']]
+# Filtrage sur le département cible
+df_communes = df_communes[df_communes['code_departement'] == dept]
+# Suppression des doublons sur le code INSEE
+df_communes = df_communes.drop_duplicates(subset='code_commune_INSEE')
+df_communes.to_csv(f'clean/{dept}-communes.csv', sep=",", index=False, quoting=QUOTE_NONNUMERIC)
 
-# insee_communes : séparateur ; , BOM utf-8, décimales avec virgule
+# ============================================================
+# EXTRACTION + TRANSFORMATION — Candidats (têtes de liste)
+# ============================================================
+
+df_candidats = pd.read_csv(
+    'data/candidats-2026.csv', sep=";",
+    dtype={'Code département': str, 'Code circonscription': str, 'CC': str}
+)
+# Normalisation des codes
+df_candidats['Code département']    = df_candidats['Code département'].str.zfill(2)
+df_candidats['Code circonscription'] = df_candidats['Code circonscription'].str.zfill(5)
+# Filtrage : département cible + têtes de liste uniquement
+df_candidats = df_candidats[df_candidats['Code département'] == dept]
+df_candidats = df_candidats[df_candidats['Tête de liste'] == 'OUI']
+df_candidats.to_csv(f'clean/{dept}-candidats.csv', sep=",", index=False, quoting=QUOTE_NONNUMERIC)
+
+# ============================================================
+# EXTRACTION + TRANSFORMATION — Données INSEE communes
+# ============================================================
+
 df_insee = pd.read_csv(
-    f"{DATA_DIR}/insee_communes.csv",
-    sep=";",
-    encoding="utf-8-sig",
-    decimal=",",
-    dtype=str,
+    'data/insee_communes.csv', sep=";",
+    encoding="utf-8-sig", decimal=",",
+    dtype={'CODGEO': str, 'REG': str, 'DEP': str}
 )
+# Normalisation des codes
+df_insee['DEP']    = df_insee['DEP'].str.zfill(2)
+df_insee['REG']    = df_insee['REG'].str.zfill(2)
+df_insee['CODGEO'] = df_insee['CODGEO'].str.zfill(5)
+# Filtrage sur le département cible
+df_insee = df_insee[df_insee['DEP'] == dept]
+df_insee.to_csv(f'clean/{dept}-insee.csv', sep=",", index=False, quoting=QUOTE_NONNUMERIC)
 
-# departements : séparateur ,
-df_depts = pd.read_csv(
-    f"{DATA_DIR}/departements-france.csv",
-    sep=",",
-    encoding="utf-8",
-    dtype=str,
-)
-
-print(f"  candidats-2026  : {len(df_candidats):>7} lignes")
-print(f"  communes        : {len(df_communes):>7} lignes")
-print(f"  insee_communes  : {len(df_insee):>7} lignes")
-print(f"  departements    : {len(df_depts):>7} lignes")
-
-# ============================================================
-# TRANSFORMATION — Unification des codes
-# ============================================================
-
-print("\n--- Transformation des codes ---")
-
-# --- candidats-2026 ---
-# Code département : déjà "01" mais nettoyage des espaces/guillemets résiduels
-df_candidats["Code département"] = (
-    df_candidats["Code département"].str.strip().str.zfill(2)
-)
-# Code circonscription (= code commune) : déjà "01001"
-df_candidats["Code circonscription"] = (
-    df_candidats["Code circonscription"].str.strip().str.zfill(5)
-)
-
-# --- communes ---
-# code_commune_INSEE : "1001" → "01001" (5 chars)
-df_communes["code_commune_INSEE"] = (
-    df_communes["code_commune_INSEE"].str.strip().str.zfill(5)
-)
-# code_departement : "1" → "01" (2 chars)
-df_communes["code_departement"] = (
-    df_communes["code_departement"].str.strip().str.zfill(2)
-)
-
-# --- insee_communes ---
-# CODGEO : "1001" → "01001"
-df_insee["CODGEO"] = df_insee["CODGEO"].str.strip().str.zfill(5)
-# DEP : "1" → "01"
-df_insee["DEP"] = df_insee["DEP"].str.strip().str.zfill(2)
-
-# --- departements ---
-# code_departement : "1" → "01"
-df_depts["code_departement"] = (
-    df_depts["code_departement"].str.strip().str.zfill(2)
-)
-
-print("  Codes unifiés : département sur 2 chars, commune sur 5 chars")
-
-# ============================================================
-# TRANSFORMATION — Filtrage têtes de liste
-# ============================================================
-
-print("\n--- Filtrage des têtes de liste ---")
-
-df_tetes = df_candidats[df_candidats["Tête de liste"].str.strip() == "OUI"].copy()
-print(f"  Têtes de liste : {len(df_tetes)} (sur {len(df_candidats)} candidats)")
-
-# ============================================================
-# TRANSFORMATION — Filtrage par département
-# ============================================================
-
-print(f"\n--- Filtrage département {DEPT_CODE} ---")
-
-dept_2 = DEPT_CODE.zfill(2)
-
-df_candidats_dept = df_candidats[df_candidats["Code département"] == dept_2].copy()
-df_tetes_dept     = df_tetes[df_tetes["Code département"] == dept_2].copy()
-df_communes_dept  = df_communes[df_communes["code_departement"] == dept_2].copy()
-df_insee_dept     = df_insee[df_insee["DEP"] == dept_2].copy()
-
-print(f"  candidats (tous)  dept {dept_2} : {len(df_candidats_dept)}")
-print(f"  têtes de liste    dept {dept_2} : {len(df_tetes_dept)}")
-print(f"  communes          dept {dept_2} : {len(df_communes_dept)}")
-print(f"  insee_communes    dept {dept_2} : {len(df_insee_dept)}")
-
-if len(df_candidats_dept) == 0:
-    print(f"\n  ATTENTION : aucune donnée pour le département '{dept_2}'.")
-    print("  Vérifiez la valeur de DEPT_CODE en tête de script.")
-
-# ============================================================
-# SAUVEGARDE — Écriture des fichiers nettoyés dans clean/
-# ============================================================
-
-print(f"\n--- Sauvegarde dans {CLEAN_DIR}/ ---")
-
-df_tetes_dept.to_csv(
-    f"{CLEAN_DIR}/candidats-tetes-{dept_2}.csv", index=False, encoding="utf-8"
-)
-df_communes_dept.to_csv(
-    f"{CLEAN_DIR}/communes-{dept_2}.csv", index=False, encoding="utf-8"
-)
-df_insee_dept.to_csv(
-    f"{CLEAN_DIR}/insee-communes-{dept_2}.csv", index=False, encoding="utf-8"
-)
-df_depts.to_csv(
-    f"{CLEAN_DIR}/departements.csv", index=False, encoding="utf-8"
-)
-
-print(f"  clean/candidats-tetes-{dept_2}.csv  ({len(df_tetes_dept)} lignes)")
-print(f"  clean/communes-{dept_2}.csv          ({len(df_communes_dept)} lignes)")
-print(f"  clean/insee-communes-{dept_2}.csv    ({len(df_insee_dept)} lignes)")
-print(f"  clean/departements.csv               ({len(df_depts)} lignes)")
-print("\nETL terminé.")
+print(f"ETL terminé pour le département {dept}.")
+print(f"  clean/{dept}-regions.csv")
+print(f"  clean/{dept}-departements.csv")
+print(f"  clean/{dept}-communes.csv     ({len(df_communes)} lignes)")
+print(f"  clean/{dept}-candidats.csv    ({len(df_candidats)} lignes)")
+print(f"  clean/{dept}-insee.csv        ({len(df_insee)} lignes)")
